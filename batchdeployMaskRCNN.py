@@ -140,50 +140,52 @@ if __name__ == '__main__':
     model.eval()
     with torch.no_grad():
         model.to(device_train)
-        file_path = args.imagePath
-        _, file_name, _ = fileparts(file_path)
-        print('processing image', file_name)
+        fileList = glob.glob(deploy_path_in + os.sep + '*.tif')
+        print(fileList)
+        for file_path in fileList:
+            _, file_name, _ = fileparts(file_path)
+            print('processing image', file_name)
 
-        img_tif = tifread(file_path)
-        img_tif = img_tif[channel,:,:]
-        img_double = uint16Gray_to_doubleGray(img_tif)
-        dsFactor = args.scalingFactor
-        hsize = int((float(img_tif.shape[0]) * float(dsFactor)))
-        vsize = int((float(img_tif.shape[1]) * float(dsFactor)))
-        img_double = (resize(img_double, (vsize, hsize), mode='reflect', order=0))
+            img_tif = tifread(file_path)
+            img_tif = img_tif[channel,:,:]
+            img_double = uint16Gray_to_doubleGray(img_tif)
+            dsFactor = args.scalingFactor
+            hsize = int((float(img_tif.shape[0]) * float(dsFactor)))
+            vsize = int((float(img_tif.shape[1]) * float(dsFactor)))
+            img_double = (resize(img_double, (vsize, hsize), mode='reflect', order=0))
 
-        PI2D.setup(img_double, suggestedPatchSize, margin)
-        for i_patch in range(PI2D.NumPatches):
-            P = PI2D.getPatch(i_patch)
-            P3 = doubleGray_to_uint8RGB(P)
-            img = torch.tensor(np.transpose(P3, [2, 0, 1]).astype(np.float32) / 255)
-            prediction = model([img.to(device_train)])
-            im = np.mean(img.numpy(), axis=0)
-            mk = prediction[0]['masks'][:, 0].cpu().numpy()
-            bb = prediction[0]['boxes'].cpu().numpy()
-            sc = prediction[0]['scores'].cpu().numpy()
+            PI2D.setup(img_double, suggestedPatchSize, margin)
+            for i_patch in range(PI2D.NumPatches):
+                P = PI2D.getPatch(i_patch)
+                P3 = doubleGray_to_uint8RGB(P)
+                img = torch.tensor(np.transpose(P3, [2, 0, 1]).astype(np.float32) / 255)
+                prediction = model([img.to(device_train)])
+                im = np.mean(img.numpy(), axis=0)
+                mk = prediction[0]['masks'][:, 0].cpu().numpy()
+                bb = prediction[0]['boxes'].cpu().numpy()
+                sc = prediction[0]['scores'].cpu().numpy()
 
-            boxes, contours = get_boxes_and_contours(im, mk, bb, sc)
+                boxes, contours = get_boxes_and_contours(im, mk, bb, sc)
 
-            PI2D.patchOutput(i_patch, boxes, contours)
+                PI2D.patchOutput(i_patch, boxes, contours)
 
-        PI2D.prepareOutput()
+            PI2D.prepareOutput()
 
-        hsize = int((float(img_tif.shape[0])))
-        vsize = int((float(img_tif.shape[1])))
-        labelMask = np.uint8(imfillholes(PI2D.Outputlabel))
-        preview = resize(65535*np.dstack((PI2D.OutputBoxes,img_double,labelMask))
-                      , (vsize, hsize), mode='reflect', order=0)
+            hsize = int((float(img_tif.shape[0])))
+            vsize = int((float(img_tif.shape[1])))
+            labelMask = np.uint8(imfillholes(PI2D.Outputlabel))
+            preview = resize(65535*np.dstack((PI2D.OutputBoxes,img_double,labelMask))
+                          , (vsize, hsize), mode='reflect', order=0)
 
-        labelMask = 255*resize(np.dstack((labelMask, labelMask, labelMask)), (vsize, hsize), mode='reflect', order=0)
-        labelMask= label(labelMask)
-        print('Found ' + str(np.amax(labelMask)) + " objects!")
+            labelMask = 255*resize(np.dstack((labelMask, labelMask, labelMask)), (vsize, hsize), mode='reflect', order=0)
+            labelMask= label(labelMask)
+            print('Found ' + str(np.amax(labelMask)) + " objects!")
 
-        skimage.io.imsave(
-            args.outputPath + '//' + file_name + '_Preview_' + str(channel) + '.tif'
-            , np.uint32(preview))
-        skimage.io.imsave(args.outputPath + '//' + file_name + '_Probabilities_' + str(channel) + '.tif',
-                          np.uint32(labelMask))
+            skimage.io.imsave(
+                args.outputPath + '//' + file_name + '_Preview_' + str(channel) + '.tif'
+                , np.uint32(preview))
+            skimage.io.imsave(args.outputPath + '//' + file_name + '_Probabilities_' + str(channel) + '.tif',
+                              np.uint32(labelMask))
 
 
 
