@@ -97,7 +97,7 @@ if __name__ == '__main__':
     deploy_path_out = args.outputPath#'D:/Seidman/maskrcnnTraining/outputs'
     channel = args.channel[0]
 
-    device_train = torch.device('cpu')#torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    device_train = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu') #torch.device('cpu')#
 
     def get_boxes_and_contours(im, mk, bb, sc):
         boxes = []
@@ -136,7 +136,8 @@ if __name__ == '__main__':
     # move model to the right device
     model.to(device_train)
 
-    model.load_state_dict(torch.load(modelPath,map_location ='cpu'))
+    # model.load_state_dict(torch.load(modelPath,map_location ='cpu'))
+    model.load_state_dict(torch.load(modelPath))
     model.eval()
     with torch.no_grad():
         model.to(device_train)
@@ -173,9 +174,9 @@ if __name__ == '__main__':
         vsize = int((float(img_tif.shape[1])))
         labelMask = np.uint8(imfillholes(PI2D.Outputlabel))
         preview = resize(65535*np.dstack((PI2D.OutputBoxes,img_double,labelMask))
-                      , (vsize, hsize), mode='reflect', order=0)
+                      , (hsize, vsize), mode='reflect', order=0)
 
-        labelMask = 255*resize(np.dstack((labelMask, labelMask, labelMask)), (vsize, hsize), mode='reflect', order=0)
+        labelMask = 255*resize(np.dstack((labelMask, labelMask, labelMask)), (hsize, vsize), mode='reflect', order=0)
         labelMask= label(labelMask)
         print('Found ' + str(np.amax(labelMask)) + " objects!")
 
