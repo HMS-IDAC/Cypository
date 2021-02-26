@@ -145,6 +145,8 @@ if __name__ == '__main__':
         for file_path in fileList:
             _, file_name, _ = fileparts(file_path)
             print('processing image', file_name)
+            fileName = os.path.basename(file_path)
+            file_name = fileName.split(os.extsep, 1)
 
             img_tif = tifread(file_path)
             img_tif = img_tif[channel,:,:]
@@ -182,9 +184,9 @@ if __name__ == '__main__':
             print('Found ' + str(np.amax(labelMask)) + " objects!")
 
             skimage.io.imsave(
-                args.outputPath + '//' + file_name + '_Preview_' + str(channel) + '.tif'
+                args.outputPath + '//' + file_name[0] + '_Preview_' + str(channel) + '.tif'
                 , np.uint32(preview))
-            skimage.io.imsave(args.outputPath + '//' + file_name + '_Probabilities_' + str(channel) + '.tif',
+            skimage.io.imsave(args.outputPath + '//' + file_name[0] + '_Probabilities_' + str(channel) + '.tif',
                               np.uint32(labelMask))
 
 
