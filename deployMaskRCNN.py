@@ -85,6 +85,7 @@ if __name__ == '__main__':
     parser.add_argument("--model",  help="type of model. For example, nuclei vs cytoplasm", default = 'zeisscytoGPU')
     parser.add_argument("--outputPath", help="output path of probability map")
     parser.add_argument("--channel", help="channel to perform inference on",  nargs = '+', default=[0])
+    parser.add_argument("--threshold", help="threshold for filtering objects. Max is 1.", type = float, default=0.6)
     parser.add_argument("--scalingFactor", help="factor by which to increase/decrease image size by", type=float,
                         default=1)
     parser.add_argument("--stackOutput", help="save probability maps as separate files", action='store_true')
@@ -103,7 +104,7 @@ if __name__ == '__main__':
         boxes = []
         contours = []
         for i in range(bb.shape[0]):
-            if sc[i] > 0.6:
+            if sc[i] > args.threshold:
                 x0, y0, x1, y1 = np.round(bb[i, :]).astype(int)
                 x0 = int(x0)
                 y0 = int(y0)
@@ -148,7 +149,7 @@ if __name__ == '__main__':
         file_name = fileName.split(os.extsep, 1)
 
         img_tif = tifread(file_path)
-        img_tif = img_tif[channel,:,:]
+        img_tif = img_tif[int(channel),:,:]
         img_double = uint16Gray_to_doubleGray(img_tif)
         dsFactor = args.scalingFactor
         hsize = int((float(img_tif.shape[0]) * float(dsFactor)))
