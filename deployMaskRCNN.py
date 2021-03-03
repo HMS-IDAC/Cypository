@@ -82,7 +82,7 @@ def get_instance_segmentation_model(num_classes):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("imagePath", help="path to the .tif files")
-    parser.add_argument("--model",  help="type of model. For example, nuclei vs cytoplasm", default = 'zeisscytoGPU')
+    parser.add_argument("--model",  help="type of model. For example, nuclei vs cytoplasm", default = 'zeisscyto')
     parser.add_argument("--outputPath", help="output path of probability map")
     parser.add_argument("--channel", help="channel to perform inference on",  nargs = '+', default=[0])
     parser.add_argument("--threshold", help="threshold for filtering objects. Max is 1.", type = float, default=0.6)

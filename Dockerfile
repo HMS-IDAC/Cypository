@@ -4,4 +4,4 @@ RUN apt-get update && apt-get install curl -y
 
 COPY . /app
 RUN mkdir -p /app/models/zeisscyto
-RUN curl -f -o /app/models/zeisscyto/zeisscyto.pt https://mcmicro.s3.amazonaws.com/models/WGA-maskRCNN/cell-mask-rcnn-zeisscyto.pt
+RUN curl -f -o /app/models/zeisscyto/zeisscyto.pt https://mcmicro.s3.amazonaws.com/models/WGA-maskRCNN/zeisscytoGPU.pt
