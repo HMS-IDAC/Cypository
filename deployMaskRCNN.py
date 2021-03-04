@@ -60,10 +60,10 @@ class CellsDataset(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.imgs)
 
-def get_instance_segmentation_model(num_classes):
+def get_instance_segmentation_model(num_classes,path):
     # load an instance segmentation model pre-trained on COCO
-    model = torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True)
-
+    # model = torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True)
+    model = torch.load(path)
     # get the number of input features for the classifier
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     # replace the pre-trained head with a new one
@@ -98,8 +98,8 @@ if __name__ == '__main__':
     deploy_path_out = args.outputPath#'D:/Seidman/maskrcnnTraining/outputs'
     channel = args.channel[0]
 
-    device_train = torch.device('cpu')#torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu') #torch.device('cpu')#
-
+    device_train = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu') #torch.device('cpu')#
+    coco_path = os.path.join(scriptPath, 'models', args.model, 'cocomodel.pt')
     def get_boxes_and_contours(im, mk, bb, sc):
         boxes = []
         contours = []
@@ -132,13 +132,13 @@ if __name__ == '__main__':
     suggestedPatchSize = 512
     margin = 128
     # get the model using our helper function
-    model = get_instance_segmentation_model(num_classes)
+    model = get_instance_segmentation_model(num_classes,coco_path)
 
     # move model to the right device
     model.to(device_train)
 
-    model.load_state_dict(torch.load(modelPath,map_location ='cpu'))
-    # model.load_state_dict(torch.load(modelPath))
+    # model.load_state_dict(torch.load(modelPath,map_location ='cpu'))
+    model.load_state_dict(torch.load(modelPath))
     model.eval()
     with torch.no_grad():
         model.to(device_train)
