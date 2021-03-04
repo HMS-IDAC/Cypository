@@ -98,7 +98,7 @@ if __name__ == '__main__':
     deploy_path_out = args.outputPath#'D:/Seidman/maskrcnnTraining/outputs'
     channel = args.channel[0]
 
-    device_train = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu') #torch.device('cpu')#
+    device_train = torch.device('cpu')#torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu') #torch.device('cpu')#
     coco_path = os.path.join(scriptPath, 'models', args.model, 'cocomodel.pt')
     def get_boxes_and_contours(im, mk, bb, sc):
         boxes = []
@@ -137,8 +137,8 @@ if __name__ == '__main__':
     # move model to the right device
     model.to(device_train)
 
-    # model.load_state_dict(torch.load(modelPath,map_location ='cpu'))
-    model.load_state_dict(torch.load(modelPath))
+    model.load_state_dict(torch.load(modelPath,map_location ='cpu'))
+    # model.load_state_dict(torch.load(modelPath))
     model.eval()
     with torch.no_grad():
         model.to(device_train)
