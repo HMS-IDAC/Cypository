@@ -62,8 +62,9 @@ class CellsDataset(torch.utils.data.Dataset):
 
 def get_instance_segmentation_model(num_classes,path):
     # load an instance segmentation model pre-trained on COCO
-    # model = torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True)
+    # model = torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True,box_detections_per_img=200)
     model = torch.load(path)
+
     # get the number of input features for the classifier
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     # replace the pre-trained head with a new one
@@ -86,10 +87,11 @@ if __name__ == '__main__':
     parser.add_argument("--outputPath", help="output path of probability map")
     parser.add_argument("--channel", help="channel to perform inference on",  nargs = '+', default=[0])
     parser.add_argument("--threshold", help="threshold for filtering objects. Max is 1.", type = float, default=0.6)
+    parser.add_argument("--overlap", help="amount of overlap when stitching. Default is 128.", type=int, default=128)
     parser.add_argument("--scalingFactor", help="factor by which to increase/decrease image size by", type=float,
                         default=1)
     parser.add_argument("--stackOutput", help="save probability maps as separate files", action='store_true')
-    parser.add_argument("--GPU", help="explicitly select GPU", type=int, default = -1)
+    parser.add_argument("--GPU", help="explicitly select GPU", action='store_true')
     args = parser.parse_args()
 
     scriptPath = os.path.dirname(os.path.realpath(__file__))
@@ -98,7 +100,14 @@ if __name__ == '__main__':
     deploy_path_out = args.outputPath#'D:/Seidman/maskrcnnTraining/outputs'
     channel = args.channel[0]
 
-    device_train = torch.device('cpu')#torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu') #torch.device('cpu')#
+    if args.GPU:
+        device_train = torch.device('cuda:1') if torch.cuda.is_available() else torch.device(
+            'cpu')  # torch.device('cpu')#
+    else:
+        device_train = torch.device('cpu')
+
+
+
     coco_path = os.path.join(scriptPath, 'models', args.model, 'cocomodel.pt')
     def get_boxes_and_contours(im, mk, bb, sc):
         boxes = []
@@ -129,16 +138,18 @@ if __name__ == '__main__':
         return boxes, contours
 
     num_classes = 2
-    suggestedPatchSize = 512
-    margin = 128
+    suggestedPatchSize =512
+    margin = args.overlap
     # get the model using our helper function
     model = get_instance_segmentation_model(num_classes,coco_path)
-
     # move model to the right device
     model.to(device_train)
 
-    model.load_state_dict(torch.load(modelPath,map_location ='cpu'))
-    # model.load_state_dict(torch.load(modelPath))
+    if args.GPU:
+        model.load_state_dict(torch.load(modelPath))
+
+    else:
+        model.load_state_dict(torch.load(modelPath, map_location='cpu'))
     model.eval()
     with torch.no_grad():
         model.to(device_train)
