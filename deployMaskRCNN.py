@@ -101,10 +101,11 @@ if __name__ == '__main__':
     channel = args.channel[0]
 
     if args.GPU:
-        device_train = torch.device('cuda:1') if torch.cuda.is_available() else torch.device(
-            'cpu')  # torch.device('cpu')#
+        device_train = torch.device('cuda')
+        print('using GPU')
     else:
         device_train = torch.device('cpu')
+        print('using CPU')
 
 
 
