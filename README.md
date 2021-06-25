@@ -1,5 +1,4 @@
-# CellMaskRCNN
-PyTorch Mask-RCNN for Cell Segmentation
+# Cypository - PyTorch Mask-RCNN for Cell Segmentation
 
 ## Parameter list:<br/>
 
