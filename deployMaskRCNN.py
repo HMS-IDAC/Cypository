@@ -137,21 +137,23 @@ if __name__ == '__main__':
                     contours.append(ct_coords)
 
         return boxes, contours
-
+    print('loaded coco model')
     num_classes = 2
     suggestedPatchSize =512
     margin = args.overlap
     # get the model using our helper function
     model = get_instance_segmentation_model(num_classes,coco_path)
+    print('loaded zeisscyto model')
     # move model to the right device
     model.to(device_train)
 
     if args.GPU:
         model.load_state_dict(torch.load(modelPath))
-
     else:
         model.load_state_dict(torch.load(modelPath, map_location='cpu'))
+
     model.eval()
+
     with torch.no_grad():
         model.to(device_train)
         file_path = args.imagePath
@@ -195,8 +197,9 @@ if __name__ == '__main__':
         labelMask= label(labelMask)
         print('Found ' + str(np.amax(labelMask)) + " objects!")
 
+        os.makedirs(args.outputPath + '//qc')
         skimage.io.imsave(
-            args.outputPath + '//' + file_name[0] + '_Preview_' + str(channel) + '.tif'
+            args.outputPath + '//qc//' + file_name[0] + '_Preview_' + str(channel) + '.tif'
             , np.uint32(preview))
         skimage.io.imsave(args.outputPath + '//' + file_name[0] + '_Probabilities_' + str(channel) + '.tif',
                           np.uint32(labelMask))
