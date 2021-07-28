@@ -1,7 +1,7 @@
 mode = 'train' # 'train', 'test', 'deploy'
 num_epochs = 5 # number of train epochs
 model_path = 'zeisscytoGPU.pt'
-dataset_path = 'D:/Seidman/zeissmrcnn'
+dataset_path = 'D:/Annotations_All'
 train_subset_fraction = 0.85 # fraction of dataset used to train; remaining goes to 'test' subset
 deploy_path_in = 'D:/Seidman/maskrcnnTraining'
 deploy_path_out = 'D:/Seidman/maskrcnnTraining/outputs'
@@ -48,10 +48,10 @@ class CellsDataset(torch.utils.data.Dataset):
         if self.ants:
             ant_path = self.ants[idx]
             mask = imread(ant_path)
-            mask=mask-1
+            # mask=mask-1
             obj_ids = np.unique(mask)
             # first id is the background, so remove it
-            obj_ids = obj_ids[2:]
+            obj_ids = obj_ids[1:]
 
             # split the color-encoded mask into a set
             # of binary masks
@@ -216,7 +216,7 @@ if __name__ == '__main__':
 
         # define training and validation data loaders
         data_loader = torch.utils.data.DataLoader(
-            dataset, batch_size=4, shuffle=True, num_workers=4,
+            dataset, batch_size=3, shuffle=True, num_workers=4,
             collate_fn=collate_fn)
 
         data_loader_test = torch.utils.data.DataLoader(

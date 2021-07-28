@@ -85,7 +85,7 @@ if __name__ == '__main__':
     parser.add_argument("imagePath", help="path to the .tif files")
     parser.add_argument("--model",  help="type of model. For example, nuclei vs cytoplasm", default = 'zeisscyto')
     parser.add_argument("--outputPath", help="output path of probability map")
-    parser.add_argument("--channel", help="channel to perform inference on",  nargs = '+', default=[0])
+    parser.add_argument("--channel", help="channel to perform inference on",  nargs = '+', default=[1])
     parser.add_argument("--threshold", help="threshold for filtering objects. Max is 1.", type = float, default=0.6)
     parser.add_argument("--overlap", help="amount of overlap when stitching. Default is 128.", type=int, default=128)
     parser.add_argument("--scalingFactor", help="factor by which to increase/decrease image size by", type=float,
@@ -98,7 +98,7 @@ if __name__ == '__main__':
     modelPath = os.path.join(scriptPath, 'models', args.model, args.model + '.pt')
     deploy_path_in = args.imagePath #'D:/Seidman/maskrcnnTraining'  # '/n/scratch3/users/c/cy101/maskrcnnTraining'
     deploy_path_out = args.outputPath#'D:/Seidman/maskrcnnTraining/outputs'
-    channel = args.channel[0]
+    channel = int(args.channel[0])-1
 
     if args.GPU:
         device_train = torch.device('cuda')
@@ -163,7 +163,7 @@ if __name__ == '__main__':
         file_name = fileName.split(os.extsep, 1)
 
         img_tif = tifread(file_path)
-        img_tif = img_tif[int(channel),:,:]
+        img_tif = img_tif[channel,:,:]
         img_double = uint16Gray_to_doubleGray(img_tif)
         dsFactor = args.scalingFactor
         hsize = int((float(img_tif.shape[0]) * float(dsFactor)))
@@ -193,15 +193,15 @@ if __name__ == '__main__':
         preview = resize(65535*np.dstack((PI2D.OutputBoxes,img_double,labelMask))
                       , (hsize, vsize), mode='reflect', order=0)
 
-        labelMask = 255*resize(np.dstack((labelMask, labelMask, labelMask)), (hsize, vsize), mode='reflect', order=0)
+        # labelMask = 255*resize(np.dstack((labelMask, labelMask, labelMask)), (hsize, vsize), mode='reflect', order=0)
         labelMask= label(labelMask)
         print('Found ' + str(np.amax(labelMask)) + " objects!")
 
         os.makedirs(args.outputPath + '//qc')
         skimage.io.imsave(
-            args.outputPath + '//qc//' + file_name[0] + '_Preview_' + str(channel) + '.tif'
+            args.outputPath + '//qc//' + file_name[0] + '_Preview_' + str(channel+1) + '.tif'
             , np.uint32(preview))
-        skimage.io.imsave(args.outputPath + '//' + file_name[0] + '_Probabilities_' + str(channel) + '.tif',
+        skimage.io.imsave(args.outputPath + '//' + file_name[0] + '_Probabilities_' + str(channel+1) + '.tif',
                           np.uint32(labelMask))
 
 
