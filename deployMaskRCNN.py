@@ -194,6 +194,7 @@ if __name__ == '__main__':
                       , (hsize, vsize), mode='reflect', order=0)
 
         # labelMask = 255*resize(np.dstack((labelMask, labelMask, labelMask)), (hsize, vsize), mode='reflect', order=0)
+        labelMask = 255 * resize(labelMask, (hsize, vsize), mode='reflect', order=0)
         labelMask= label(labelMask)
         print('Found ' + str(np.amax(labelMask)) + " objects!")
 
