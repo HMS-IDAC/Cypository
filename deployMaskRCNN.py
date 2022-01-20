@@ -86,8 +86,8 @@ if __name__ == '__main__':
     parser.add_argument("--model",  help="type of model. For example, nuclei vs cytoplasm", default = 'zeisscyto')
     parser.add_argument("--outputPath", help="output path of probability map")
     parser.add_argument("--channel", help="channel to perform inference on",  nargs = '+', default=[1])
-    parser.add_argument("--threshold", help="threshold for filtering objects. Max is 1.", type = float, default=0.6)
-    parser.add_argument("--overlap", help="amount of overlap when stitching. Default is 128.", type=int, default=128)
+    parser.add_argument("--threshold", help="threshold for filtering objects. Max is 1.", type = float, default=0.5)
+    parser.add_argument("--overlap", help="amount of overlap when stitching. Default is 64.", type=int, default=64)
     parser.add_argument("--scalingFactor", help="factor by which to increase/decrease image size by", type=float,
                         default=1)
     parser.add_argument("--stackOutput", help="save probability maps as separate files", action='store_true')
@@ -123,7 +123,7 @@ if __name__ == '__main__':
                 x1 = np.minimum(x1, im.shape[1] - 1)
                 y1 = np.minimum(y1, im.shape[0] - 1)
 
-                if (y1 - y0) * (x1 - x0) < (im.shape[0] * im.shape[1] * 0.1):
+                if (y1 - y0) * (x1 - x0) < (im.shape[0] * im.shape[1] * 0.3):
                     boxes.append([x0, y0, x1, y1])
 
                     # maskSlice = resize(p[i,:,:], (sizeOut[0], sizeOut[1]), mode='reflect')
@@ -131,8 +131,9 @@ if __name__ == '__main__':
                     mask_box[y0:y1, x0:x1] = True
 
                     mask_i = np.logical_and(mk[i, :, :] > 0.6, mask_box)
-                    mask_i = morphology.remove_small_holes(morphology.remove_small_objects(mask_i,30), 1000)
-                    ct =np.logical_and(mask_i, np.logical_not(imerode(mask_i, 1)))
+                    mask_i = morphology.remove_small_holes(morphology.remove_small_objects(mask_i,10), 1000)
+                    ct =mask_i
+                    # ct = np.logical_and(mask_i, np.logical_not(imerode(mask_i, 1)))
                     ct_coords = np.argwhere(ct)
                     contours.append(ct_coords)
 
@@ -161,9 +162,8 @@ if __name__ == '__main__':
         print('processing image', file_name)
         fileName = os.path.basename(file_path)
         file_name = fileName.split(os.extsep, 1)
-
         img_tif = tifread(file_path)
-        img_tif = img_tif[channel,:,:]
+        img_tif = img_tif[channel, :, :]
         img_double = uint16Gray_to_doubleGray(img_tif)
         dsFactor = args.scalingFactor
         hsize = int((float(img_tif.shape[0]) * float(dsFactor)))
@@ -175,6 +175,7 @@ if __name__ == '__main__':
             P = PI2D.getPatch(i_patch)
             P3 = doubleGray_to_uint8RGB(P)
             img = torch.tensor(np.transpose(P3, [2, 0, 1]).astype(np.float32) / 255)
+
             prediction = model([img.to(device_train)])
             im = np.mean(img.numpy(), axis=0)
             mk = prediction[0]['masks'][:, 0].cpu().numpy()

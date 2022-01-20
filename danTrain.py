@@ -1,10 +1,10 @@
-mode = 'train' # 'train', 'test', 'deploy'
-num_epochs = 5 # number of train epochs
+mode = 'deploy' # 'train', 'test', 'deploy'
+num_epochs = 8 # number of train epochs
 model_path = 'zeisscytoGPU.pt'
-dataset_path = 'D:/Annotations_All'
-train_subset_fraction = 0.85 # fraction of dataset used to train; remaining goes to 'test' subset
+dataset_path = 'D:/Seidman/zeissmrcnn4'
+train_subset_fraction = 0.8 # fraction of dataset used to train; remaining goes to 'test' subset
 deploy_path_in = 'D:/Seidman/maskrcnnTraining'
-deploy_path_out = 'D:/Seidman/maskrcnnTraining/outputs'
+deploy_path_out = 'D:/Seidman/maskrcnnTraining/outputs2'
 
 # -------------------------
 
@@ -22,6 +22,7 @@ from PIL import Image
 import torchvision
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision.models.detection.mask_rcnn import MaskRCNNPredictor
+from torchvision.models.detection.rpn import AnchorGenerator
 import math
 import matplotlib.pyplot as plt
 from skimage import morphology
@@ -66,7 +67,24 @@ class CellsDataset(torch.utils.data.Dataset):
                 xmax = np.max(pos[1])
                 ymin = np.min(pos[0])
                 ymax = np.max(pos[0])
+                if (xmin == xmax) or (ymin == ymax):
+                    continue
                 boxes.append([xmin, ymin, xmax, ymax])
+            #
+            # print(ant_path)
+            # print(num_objs)
+            # print(obj_ids)
+            # im2=img
+            # for i in range(num_objs):
+            #         im2[boxes[i][1]:boxes[i][3], boxes[i][0]] = 255
+            #         im2[boxes[i][1]:boxes[i][3], boxes[i][2]] = 255
+            #         im2[boxes[i][1],boxes[i][0]:boxes[i][2]] = 255
+            #         im2[boxes[i][3], boxes[i][0]:boxes[i][2]] = 255
+            #
+            # plt.imshow(im2, cmap='gray')
+            # plt.show()
+
+
 
             boxes = torch.as_tensor(boxes, dtype=torch.float32)
             # there is only one class
@@ -86,6 +104,7 @@ class CellsDataset(torch.utils.data.Dataset):
             target["area"] = area
             target["iscrowd"] = iscrowd
 
+
         if self.transforms is not None:
             img, target = self.transforms(img, target)
 
@@ -95,6 +114,7 @@ class CellsDataset(torch.utils.data.Dataset):
         return len(self.imgs)
 
 def get_instance_segmentation_model(num_classes):
+
     # load an instance segmentation model pre-trained on COCO
     model = torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True)
 
@@ -135,10 +155,10 @@ def train_one_epoch(model, optimizer, data_loader, device):
 
         loss_value = losses_reduced.item()
 
-        if not math.isfinite(loss_value):
-            print("Loss is {}, stopping training".format(loss_value))
-            print(loss_dict_reduced)
-            sys.exit(1)
+        # if not math.isfinite(loss_value):
+        #     print("Loss is {}, stopping training".format(loss_value))
+        #     print(loss_dict_reduced)
+        #     sys.exit(1)
 
         optimizer.zero_grad()
         losses.backward()
@@ -216,11 +236,11 @@ if __name__ == '__main__':
 
         # define training and validation data loaders
         data_loader = torch.utils.data.DataLoader(
-            dataset, batch_size=3, shuffle=True, num_workers=4,
+            dataset, batch_size=4, shuffle=True, num_workers=4,
             collate_fn=collate_fn)
 
         data_loader_test = torch.utils.data.DataLoader(
-            dataset_test, batch_size=1, shuffle=False, num_workers=4,
+            dataset_test, batch_size=4, shuffle=False, num_workers=4,
             collate_fn=collate_fn)
 
         print('n train', len(dataset), 'n test', len(dataset_test))
@@ -276,6 +296,7 @@ if __name__ == '__main__':
 
             for img_index in range(len(dataset_test)):
                 img, _ = dataset_test[img_index]
+
                 prediction = model([img.to(device_train)])
 
                 im = np.mean(img.numpy(),axis=0)
@@ -292,7 +313,7 @@ if __name__ == '__main__':
                     x0, y0, x1, y1 = np.round(bb[i,:]).astype(int)
                     x1 = np.minimum(x1, im2.shape[1]-1)
                     y1 = np.minimum(y1, im2.shape[0]-1)
-                    if sc[i] > 0.75:
+                    if sc[i] > 0.6:
                         im2[y0:y1,x0] = 1
                         im2[y0:y1,x1] = 1
                         im2[y0,x0:x1] = 1
@@ -318,7 +339,9 @@ if __name__ == '__main__':
                 _, file_name, _ = fileparts(file_path)
                 print('processing image', file_name)
 
-                img, _ = dataset_deploy[img_index]
+                img1, _ = dataset_deploy[img_index]
+                img= img1[:,0:512,0:512]
+
                 prediction = model([img.to(device_train)])
 
                 im = np.mean(img.numpy(),axis=0)
@@ -330,22 +353,22 @@ if __name__ == '__main__':
                 sc = prediction[0]['scores'].cpu().numpy()
                 im2 = 0 * np.copy(im)
                 for i in range(bb.shape[0]):
-                    if sc[i] > 0.65:
-                        mask = morphology.remove_small_holes(morphology.remove_small_objects(p[i,:,:]>0.6,50), 1000)
+                    if sc[i] > 0.5:
+                        mask = morphology.remove_small_holes(morphology.remove_small_objects(p[i,:,:]>0.65,10), 1000)
                         im2[mask==1] = i
                 imwrite(im2, deploy_path_out+'/'+file_name+'_label.tif')
                 # imwrite(p,deploy_path_out+'/'+file_name+'_labelStack.tif')
 
-            # im2 = 0.9*np.copy(im)
-                # for i in range(bb.shape[0]):
-                #     x0, y0, x1, y1 = np.round(bb[i,:]).astype(int)
-                #     x1 = np.minimum(x1, im2.shape[1]-1)
-                #     y1 = np.minimum(y1, im2.shape[0]-1)
-                #     if sc[i] > 0.5:
-                #         im2[y0:y1,x0] = 1
-                #         im2[y0:y1,x1] = 1
-                #         im2[y0,x0:x1] = 1
-                #         im2[y1,x0:x1] = 1
-                #
-                # imwrite(np.uint8(255*im2), deploy_path_out+'/'+file_name+'_bb.png')
+                im2 = 0.9*np.copy(im)
+                for i in range(bb.shape[0]):
+                    x0, y0, x1, y1 = np.round(bb[i,:]).astype(int)
+                    x1 = np.minimum(x1, im2.shape[1]-1)
+                    y1 = np.minimum(y1, im2.shape[0]-1)
+                    if sc[i] > 0.5:
+                        im2[y0:y1,x0] = 1
+                        im2[y0:y1,x1] = 1
+                        im2[y0,x0:x1] = 1
+                        im2[y1,x0:x1] = 1
+
+                imwrite(np.uint8(255*im2), deploy_path_out+'/'+file_name+'_bb.png')
                 # imwrite(np.uint8(255*p_max), deploy_path_out+'/'+file_name+'_pm.png')
