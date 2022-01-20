@@ -1,4 +1,4 @@
-FROM pytorch/pytorch:1.4-cuda10.1-cudnn7-runtime
+FROM pytorch/pytorch:1.7-cuda10.1-cudnn7-runtime
 RUN pip install torchvision scikit-image pandas czifile nd2reader
 RUN apt-get update && apt-get install curl -y
 
