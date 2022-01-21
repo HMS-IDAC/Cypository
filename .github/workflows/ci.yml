@@ -1,0 +1,13 @@
+name: CI
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2           
+      - name: Build the Docker container
+        run: docker build -t test .
+      - name: Test the container
+        run: docker run --rm test python /app/deployMaskRCNN.py /app/CypositoryTest.ome.tif --stackOutput --outputPath .
