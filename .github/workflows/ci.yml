@@ -10,4 +10,4 @@ jobs:
       - name: Build the Docker container
         run: docker build -t test .
       - name: Test the container
-        run: docker run --rm test python /app/deployMaskRCNN.py /app/CypositoryTest.ome.tif --stackOutput --outputPath .
+        run: docker run --rm test python /app/deployMaskRCNN.py /app/exemplar-003.ome.tif --stackOutput --outputPath .
