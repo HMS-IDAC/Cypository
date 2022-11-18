@@ -25,9 +25,9 @@ import glob
 from scipy import arange
 from PartitionOfImageOMtest import PI2D
 from skimage.transform import resize
-from toolbox import listfiles, tifread, uint16Gray_to_uint8RGB, imread, Compose, RandomHorizontalFlip, ToTensor, \
+from toolbox import listfiles, tifread, uint16Gray_to_uint8RGB, uint8Gray_to_doubleGray, imread, Compose, RandomHorizontalFlip, ToTensor, \
     get_transform, collate_fn, reduce_dict, imshow, fileparts, imwrite, imerode, imgaussfilt, \
-    uint16Gray_to_doubleGray, doubleGray_to_uint8RGB,imfillholes
+    uint16Gray_to_doubleGray, doubleGray_to_uint8RGB,imfillholes,imadjust
 
 class CellsDataset(torch.utils.data.Dataset):
     def __init__(self, root, transforms=None, load_annotations=True,channel=0,scaling=1):
@@ -90,7 +90,7 @@ if __name__ == '__main__':
     parser.add_argument("--threshold", help="threshold for filtering objects. Max is 1.", type = float, default=0.5)
     parser.add_argument("--overlap", help="amount of overlap when stitching. Default is 64.", type=int, default=64)
     parser.add_argument("--scalingFactor", help="factor by which to increase/decrease image size by", type=float,
-                        default=2.5)
+                        default=1)
     parser.add_argument("--stackOutput", help="save probability maps as separate files", action='store_true')
     parser.add_argument("--GPU", help="explicitly select GPU", action='store_true')
     args = parser.parse_args()
@@ -107,7 +107,7 @@ if __name__ == '__main__':
     else:
         device_train = torch.device('cpu')
         print('using CPU')
-    os.environ['CUDA_VISIBLE_DEVICES'] = '%d' % 1
+
 
 
     coco_path = os.path.join(scriptPath, 'models', args.model, 'cocomodel.pt')
@@ -131,7 +131,7 @@ if __name__ == '__main__':
                     # maskSlice = resize(p[i,:,:], (sizeOut[0], sizeOut[1]), mode='reflect')
                     mask_box = np.zeros(im.shape, dtype=bool)
                     mask_box[y0:y1, x0:x1] = True
-                    mask_i = np.logical_and(mk[i, :, :] > 0.4, mask_box)
+                    mask_i = np.logical_and(mk[i, :, :] > 0.3, mask_box)
                     mask_i = morphology.remove_small_holes(morphology.remove_small_objects(mask_i,10), 1000)
                     ct =mask_i
                     # ct = np.logical_and(mask_i, np.logical_not(imerode(mask_i, 1)))
@@ -164,46 +164,50 @@ if __name__ == '__main__':
         print('processing image', file_name)
         fileName = os.path.basename(file_path)
         file_name = fileName.split(os.extsep, 1)
-        img_tif = tifread(file_path)
-        img_double = uint16Gray_to_doubleGray(img_tif)
+        fullStack = tifread(file_path)
+        fullStack = imadjust(fullStack)
+        print(np.amax(fullStack))
+        print(fullStack.shape)
+        # fullStack = fullStack[50:51,:,:,:]
+        sizeZ = fullStack.shape[0]
+        preview = np.zeros((sizeZ,fullStack.shape[2],fullStack.shape[3],3))
+        for iZ in range(sizeZ):
+            print('Working on Z-plane ' + str(iZ))
+            img_tif= fullStack[iZ,:,:,:]
+            # img_double = uint8Gray_to_doubleGray(img_tif)
+            dsFactor = args.scalingFactor
+            hsize = int((float(img_tif.shape[2]) * float(dsFactor)))
+            vsize = int((float(img_tif.shape[1]) * float(dsFactor)))
+            img_double = (resize(img_tif, (3, vsize, hsize)))
+            PI2D.setup(img_double, suggestedPatchSize, margin)
+            print(time.perf_counter())
+            for i_patch in range(PI2D.NumPatches):
+                P = PI2D.getPatch(i_patch)
+                img = torch.tensor(P.astype(np.float32))
+                prediction = model([img.to(device_train)])
+                im = np.mean(img.numpy(), axis=0)
+                mk = prediction[0]['masks'][:, 0].cpu().numpy()
+                bb = prediction[0]['boxes'].cpu().numpy()
+                sc = prediction[0]['scores'].cpu().numpy()
+                boxes, contours, scores = get_boxes_and_contours(im, mk, bb, sc)
+                print(str(len(boxes)) + ' Completed ' + str(i_patch/PI2D.NumPatches*100) + '%')
+                PI2D.patchOutput(i_patch, boxes, contours, scores)
+            PI2D.prepareOutput()
 
-        dsFactor = args.scalingFactor
-        hsize = int((float(img_tif.shape[1]) * float(dsFactor)))
-        vsize = int((float(img_tif.shape[2]) * float(dsFactor)))
-        img_double = (resize(img_double, (3, vsize, hsize),preserve_range=True))
-        print(img_double.shape)
-        PI2D.setup(img_double, suggestedPatchSize, margin)
-        print(time.perf_counter())
-        for i_patch in range(PI2D.NumPatches):
-            P = PI2D.getPatch(i_patch)
-            img = torch.tensor(P.astype(np.float32))
-            # imshow(img[1,:,:])
-            prediction = model([img.to(device_train)])
-            im = np.mean(img.numpy(), axis=0)
-            mk = prediction[0]['masks'][:, 0].cpu().numpy()
-            bb = prediction[0]['boxes'].cpu().numpy()
-            sc = prediction[0]['scores'].cpu().numpy()
-            boxes, contours, scores = get_boxes_and_contours(im, mk, bb, sc)
-            print(str(len(boxes)) + ' Completed ' + str(i_patch/PI2D.NumPatches*100) + '%')
-            PI2D.patchOutput(i_patch, boxes, contours, scores)
+            hsize = int((float(img_tif.shape[0])))
+            vsize = int((float(img_tif.shape[1])))
+            labelMask = PI2D.Outputlabel
+            preview[iZ,:,:,:] = 255*np.dstack((PI2D.OutputBoxes,img_double[1,:,:],labelMask))
+            print(time.perf_counter())
 
-        PI2D.prepareOutput()
+            print('Found ' + str(np.amax(labelMask)) + " objects!")
 
-        hsize = int((float(img_tif.shape[0])))
-        vsize = int((float(img_tif.shape[1])))
-        labelMask = np.uint8(imfillholes(PI2D.Outputlabel))
-        preview = 65535*np.dstack((PI2D.OutputBoxes,img_double[0,:,:],labelMask))
-        print(time.perf_counter())
-        labelMask = 255 * labelMask
-        labelMask= label(labelMask)
-        print('Found ' + str(np.amax(labelMask)) + " cells!")
-
-        # os.makedirs(args.outputPath + '//qc')
+            # os.makedirs(args.outputPath + '//qc')
         skimage.io.imsave(
             args.outputPath + '//qc//' + file_name[0] + '_Preview_' + str(channel+1) + '.tif'
             , np.uint32(preview))
-        skimage.io.imsave(args.outputPath + '//' + file_name[0] + '_Probabilities_' + str(channel+1) + '.tif',
-                          np.uint32(labelMask))
+        # skimage.io.imsave(args.outputPath + '//' + file_name[0] + '_Probabilities_' + str(channel+1) + '.tif',
+        #                   np.uint32(labelMask))
 
 
 

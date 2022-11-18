@@ -4,6 +4,8 @@ split/merge utilities to help processing large images; 'object masks' version
 
 import numpy as np
 from toolbox import *
+import torch
+from torchvision.ops import nms
 
 class PI2D:
     Image = None
@@ -16,6 +18,7 @@ class PI2D:
     NC = None
     Boxes = []
     Contours = []
+    Scores = []
     OutputRaw = None
     Output = None
 
@@ -35,6 +38,7 @@ class PI2D:
 
         PI2D.Boxes = []
         PI2D.Contours = []
+        PI2D.Scores = []
 
         PI2D.Image = image
         PI2D.SuggestedPatchSize = suggestedPatchSize
@@ -79,12 +83,14 @@ class PI2D:
         if len(PI2D.Image.shape) == 3:
             return PI2D.Image[:,r0:r1,c0:c1]
 
-    def patchOutput(i,bbs,cts):
+    def patchOutput(i,bbs,cts, sc):
         """
         adds result bounding boxes (bbs) and countours (cts)
         of i-th tile processing to the output image
         """
-
+        boxes = PI2D.Boxes
+        contours = PI2D.Contours
+        scores = PI2D.Scores
         r0,r1,c0,c1 = PI2D.PC[i]
         for idx in range(len(bbs)):
             xmin, ymin, xmax, ymax = bbs[idx] # x: cols; y: rows
@@ -144,8 +150,13 @@ class PI2D:
             #         PI2D.Boxes.append(candidate_box)
             #         PI2D.Contours.append(candidate_contour)
             # else:
-            PI2D.Boxes.append(candidate_box)
-            PI2D.Contours.append(candidate_contour)
+            boxes.append(candidate_box)
+            contours.append(candidate_contour)
+            scores.append(sc[idx])
+
+        PI2D.Boxes = boxes
+        PI2D.Contours = contours
+        PI2D.Scores = scores
 
     def prepareOutput():
         """
@@ -153,20 +164,28 @@ class PI2D:
         which is accessible at PI2D.Output; the output with unresolved
         intersections is accessible at PI2D.OutputRaw
         """
-
-        boxes = PI2D.Boxes
-        contours = PI2D.Contours
+        boxes = []
+        contours = []
+        tempboxes = torch.as_tensor(PI2D.Boxes, dtype=torch.float32)
+        tempscores = torch.as_tensor(PI2D.Scores, dtype=torch.float32)
         PI2D.OutputBoxes = np.copy(PI2D.Image[0,:,:]) * 0
         PI2D.Outputlabel = np.copy(PI2D.Image[0,:,:]) * 0
+        if len(PI2D.Boxes) > 0:
+            idx=nms(boxes=tempboxes, scores=tempscores, iou_threshold=0.2)
+            for i in idx:
+                boxes.append(np.array(tempboxes[(i)].tolist(),int))
+                contours.append(PI2D.Contours[i])
 
-        for idx in range(len(boxes)):
-            xmin, ymin, xmax, ymax = boxes[idx] # x: cols; y: rows
-            ct = contours[idx]
-            for row in range(ymin,ymax+1):
-                PI2D.OutputBoxes[row, xmin] = 1
-                PI2D.OutputBoxes[row, xmax] = 1
-            for col in range(xmin, xmax+1):
-                PI2D.OutputBoxes[ymin, col] = 1
-                PI2D.OutputBoxes[ymax, col] = 1
-            for rc in ct:
-                PI2D.Outputlabel[rc[0],rc[1]] = 1
+
+            for idx in range(len(boxes)):
+                xmin, ymin, xmax, ymax = boxes[idx] # x: cols; y: rows
+                ct = contours[idx]
+                for row in range(ymin,ymax+1):
+                    PI2D.OutputBoxes[row, xmin] = 1
+                    PI2D.OutputBoxes[row, xmax] = 1
+                for col in range(xmin, xmax+1):
+                    PI2D.OutputBoxes[ymin, col] = 1
+                    PI2D.OutputBoxes[ymax, col] = 1
+                for rc in ct:
+                    PI2D.Outputlabel[rc[0],rc[1]] = idx
+

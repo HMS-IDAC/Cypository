@@ -184,6 +184,15 @@ def uint16Gray_to_uint8RGB(I):
     I = imadjust(I.astype('float64')/65535)
     return np.uint8(255*np.stack([I,I,I],axis=2))
 
+def uint8Gray_to_uint8RGB(I):
+    assert I.dtype == 'uint8'
+    I = imadjust(I.astype('float64')/255)
+    return np.uint8(255*I)
+
+def uint8Gray_to_doubleGray(I):
+    assert I.dtype == 'uint8'
+    return I.astype('float64')/255
+
 def uint16Gray_to_doubleGray(I):
     assert I.dtype == 'uint16'
     return imadjust(I.astype('float64')/65535)
